@@ -98,3 +98,31 @@ bin/kafka-topics.sh \
 --describe
 ```  
 
+
+## Message 보내기
+#### 메세지 전송
+```
+$  bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
+```  
+* bin/kafka-console-producer.sh : 프로듀서 콘솔 실행파일
+
+* --bootstrap-server : 호스트/포트 지정
+
+* --topic : 메세지를 보낼 토픽 지정
+
+- 위 명령어를 입력하면 입력 콘솔로 변한다.  
+
+- 이때 기본적으로 한줄 단위로 분리된 메세지로 보내지게 된다.  
+
+
+#### 메세지 읽기
+```
+$ bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test --from-beginning
+```  
+* bin/kafka-console-consumer.sh : 컨슈머 콘솔 실행파일
+
+* --bootstrap-server : 호스트/포트 지정
+
+* --topic : 메세지를 읽을 토픽 지정
+
+* --from-beginning : 메세지를 어디서 부터 읽을 지 지정
