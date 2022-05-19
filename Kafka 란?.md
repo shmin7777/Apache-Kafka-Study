@@ -1,3 +1,8 @@
+Event-driven 방식  
+
+https://jaehun2841.github.io/2019/06/23/2019-06-23-event-driven-architecture/#Event-Driven-%EB%9E%80  
+
+
 # 메시지 큐(Message Queue)
 메시지 큐(Message Queue 이하 MQ)란 프로세스(프로그램) 간에 데이터를 교환할 때 사용하는 통신 방법  
 더 큰 개념으로는 MOM(Message Oriented Middleware : 메시지 지향 미들웨어 이하 MOM)를 의미한다.  
