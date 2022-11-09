@@ -60,4 +60,12 @@ Leader partition에 데이터를 보낸 후 Follower partition에 데이터가 �
 
 
 
+# replication  
+replication이 HA에 중요한 역할을 하지만 많을 수록 좋은것은 아님.  
+![image](https://user-images.githubusercontent.com/67637716/200746583-79ea14f1-0b35-4beb-80b4-ee230cfb9c36.png)  
+REPLICATION이 많아지면 그만큼 브로커의 리소스 사용량도 많아지게 된다.  
+따라서 카프카에 들어오는 데이터량과 retention date(저장시간)을 잘 생각해서 replication 개수를 정하는 것이 좋다.  
+3개 이상의 브로커를 사용할 떄 replication은 3으로 설정하는 것을 권장한다.  
+
+
 
