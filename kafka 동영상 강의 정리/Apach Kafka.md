@@ -69,6 +69,15 @@ for(ConsumerRecord<String, String> record : records){
 
 
 
+# Question
+```  
+Q : Kafka broker 이슈에 대응하기 위해 사용할 수 있는 방법은?
+
+A : Partition을 다른 Broker에 복제하여 이슈에 대응한다.
+    1번 Broker에 이슈가 생기면 다른 Broker에 복제된 데이터를 사용한다.
+```  
+
+
 
 
 
