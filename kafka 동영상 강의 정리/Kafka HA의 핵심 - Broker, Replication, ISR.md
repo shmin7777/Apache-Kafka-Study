@@ -21,7 +21,8 @@ replicatino이 2라면 파티션은 원본 1개와 복제본 한개로 총 2개�
 ![image](https://user-images.githubusercontent.com/67637716/200744503-33cdd909-7a50-412d-becd-90b930a61119.png)   
 
 원본 1개의 파티션은 Leader partition이라 부르고 나머지 복제 파티션은 Follower partition이라고 부른다.  
-Leader, Follower partition을 합쳐서 ISR, (In Sync Replica)라고 볼 수 있다.  
+특정 파티션의 리더의 레코드가 모두 팔로우에 복제되어 sync가 맞는 상태를 `ISR(In-Sync Replic)` 라고 부른다.  
+
 
 # replication 을 사용하는 이유??
 ![image](https://user-images.githubusercontent.com/67637716/200744966-9be18797-2720-4a0b-b128-59d610e18d57.png)  
@@ -33,6 +34,12 @@ replication 이 1이고 partition이 1인 topic이 존재한다고 할때.
 
 replication 이 2라면 브로커가 1개 가 죽더라도 Follower partition이 존재하므로 복제본으로 복구가 가능함.  
 나머지 1개가 남은 Follower partition이 Leader partition역할을 승계하게 되는 것.  
+장애가 나면 Leader partition에서 Follower partition으로 복제가 안된 data가 있을 수 있다.
+ISR이 아닌 상태라고 하며, `unclean.leader.election.enable` 옵션을 사용할 수 있다.  
+이 옵션은 default false이며, Leader partition 이 포함된 Broker가 살아날 때까지 Leader partition을 변경 하지 않는 것, 즉 데이터를 전송하지 않는 것이다.  
+만약 유실된 데이터보다 지금 당장 데이터를 보는것이 중요하다 싶을 땐 이 옵션을 true로 주면 된다.  
+
+
 
 # Leader partition과 Follower partition의 역할?
 프로듀서가 토픽의 파티션에 전달한다.  
