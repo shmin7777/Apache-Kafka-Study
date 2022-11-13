@@ -296,6 +296,10 @@ polling할때 wakeup exception발생해서 정상적으로 종료할 수 있다.
 * SIGTERM을 통한 shutdown signal로 kill하여 처리한 데이터 커밋 필요
 * SIGKILL(9)는 프로세스 강제 종료로 커밋 불가 -> 중복/유실 발생
 
+안정적으로 종료가능.  
+리밸런스가 발생한 것을 브로커에게 명시적으로 전달할 수 있다.  
+
+
 ``` java
 
 Runtime.getRuntime().addShutdownHook(new Thread() {
