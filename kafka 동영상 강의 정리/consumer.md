@@ -169,19 +169,6 @@ enable.auto.commit=false
 	* 1개가 처리될때마다 1번씩 offset commit가능  
 ![image](https://user-images.githubusercontent.com/67637716/201509903-6b6e3796-b25e-4582-ab93-f2c9264a613f.png)  
 
-
-
-
-
-#### commitAsync()
-* 동기 커밋보다 빠름
-	* 커밋을 요청하는 시간동안 polling을 기다리지 않음
-* 중복이 발생할 수 있음
-	* 일시적인 통신 문제로 이전 offset보다 이후 offset이 먼저 커밋 될때
-* consumerRecord 처리 순서 보장 x
-	* 처리 순서가 중요한 서비스(주문, 재고관리 등)에서는 사용 제한
-
-
 ``` java
 while (true) {
 	ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
@@ -197,25 +184,151 @@ while (true) {
 }
 
 //// offset 지정 커밋
-
 while (true) {
 	ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
-	Map<TopicPartition, OffsetAndMetadata> currentOffset = new HashMap<>();
+	Map<TopicPartition,	OffsetAndMetadata> currentOffset = new HashMap<>();
 	records.forEach(record -> {
 		currentOffset.put(new TopicPartition(record.topic(), record.partition()),
 				new OffsetAndMetadata(record.offset() + 1, null));
-		consumer.commitSync();
+		try {
+		consumer.commitSync(currentOffset);
+		}catch(CommitFailedException e) {
+			System.err.println("commit failed");
+		}
 		System.out.println(record.value());
 	});
-
-	try {
-		consumer.commitSync();
-	}catch(CommitFailedException e) {
-		System.err.println("commit failed");
-	}
 }
+```  
+
+
+
+#### commitAsync()
+* 동기 커밋보다 빠름
+	* 커밋을 요청하는 시간동안 polling을 기다리지 않음
+* 중복이 발생할 수 있음
+	* 일시적인 통신 문제로 이전 offset보다 이후 offset이 먼저 커밋 될때
+* consumerRecord 처리 순서 보장 x
+	* 처리 순서가 중요한 서비스(주문, 재고관리 등)에서는 사용 제한
+
+
+``` java
+while (true) {
+	ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+	records.forEach(record -> {
+		  System.out.println(record.value());
+	});
+
+	consumer.commitAsync();
+}
+// callback을 통해 offset commit동 가능해 보임.  
 
 ```  
+
+## 리밸런스
+컨슈머 그룹의 파티션 소유권이 변경될 때 일어나는 현상  
+* 리밸런스를 하는동안 일시적으로 메시지를 가져올 수 없음
+* 리밸런스 발생시 데이터 유실/중복 발생 가능성 있음
+	* 리밸런스 리스너 - commitSync() 또는 추가적인 방법(unique key)으로 데이터 유실/중복 방지
+* consumer.close() 호출시 또는 consumer의 세션이 끊어졌을 때 발생한다.
+
+![image](https://user-images.githubusercontent.com/67637716/201510597-57e017d8-b7ac-4d8b-8d56-e4327226e103.png)  
+
+session timeout 시간을 보통 hearbeat 시간 * 3 으로 한다고함.  
+
+
+#### Consumer rebalance listener  
+![image](https://user-images.githubusercontent.com/67637716/201510659-4b365203-707b-4b2c-8315-e41ddefd270e.png)  
+
+```  java
+KafkaConsumer<String, String> consumer = new KafkaConsumer<>(configs);
+
+consumer.subscribe(Arrays.asList(TOPIC_NAME), new ConsumerRebalanceListener() {
+
+	@Override
+	public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+		// 파티션이 끊어졌을때
+		// offset commit 
+		consumer.commitSync(currentOffsets); 
+	
+		// consumer가 많을 때 리밸런스 시간 측정을 통한 컨슈머 모니터링 가능
+	}
+
+	@Override
+	public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+		// 파티션을 새로 할당 받았을 때 
+	}
+
+});
+```  
+
+## consumer wakeup
+consumer를 정상적으로 종료할 때 사용.  
+polling할때 wakeup exception발생해서 정상적으로 종료할 수 있다.  
+
+``` java
+ while (true) {
+  ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+  for (ConsumerRecord<String, String> record : records) {
+      System.out.println(record.value());
+  }
+  try {
+			consumer.commitSync(currentOffset);
+		} catch (CommitFailedException e) {
+			System.err.println("commit failed");
+		}
+}
+```  
+
+#### SIGKILL(강제 중단)으로 인한 중복 처리 발생 예시  
+1) poll 호출
+	- 마지막 커밋된 오프셋이 100
+	- records 100개 반환 : 오프셋 101 ~ 200
+	- ![image](https://user-images.githubusercontent.com/67637716/201511374-b89a45d6-6869-4e50-80f9-31e60ddcce5d.png)  
+2) records loop 구문 수행
+3) record.value()  150번 오프셋 print 중 SIGKILL 호출
+	- 101번 ~ 150번 오프셋 처리완료, 151 ~ 200 미처리
+	- ![image](https://user-images.githubusercontent.com/67637716/201511411-09d95556-7c6d-4422-94f0-c4bbef671c2c.png)  
+4) offset 200 커밋 불가
+	- 브로커에는 100번 오프셋이 마지막 커밋
+	- 컨슈머 재시작시 다시 오프셋 101부터 처리 시작
+
+#### wakeup()을 통한 graceful shutdown 필수!
+* SIGTERM을 통한 shutdown signal로 kill하여 처리한 데이터 커밋 필요
+* SIGKILL(9)는 프로세스 강제 종료로 커밋 불가 -> 중복/유실 발생
+
+``` java
+
+Runtime.getRuntime().addShutdownHook(new Thread() {
+	@Override
+	public void run() {
+		consumer.wakeup();
+	}
+});
+
+try {
+	while (true) {
+		ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+		for (ConsumerRecord<String, String> record : records) {
+			System.out.println(record.value());
+		}
+		try {
+			consumer.commitSync(currentOffset);
+		} catch (CommitFailedException e) {
+			System.err.println("commit failed");
+		}
+	}
+} catch (WakeupException e) {
+	System.err.println("poll() method trigger wakeupException");
+} finally {
+	consumer.commitSync();
+	consumer.close();
+}
+```  
+
+
+
+
+
 
 
 
