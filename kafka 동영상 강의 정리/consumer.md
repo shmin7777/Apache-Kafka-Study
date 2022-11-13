@@ -135,9 +135,94 @@ __consumer_offset 토픽에는 컨슈머 그룹별로 토픽별로 offset을 나
 하나의 토픽으로 데이터는 다양한 역할을 하는 컨슈머들이 각자 원하는 데이터로 처리할 수 있다.  
 
 
+## auto commit
+```  
+enable.auto.commit : 자동 오프셋 커밋 여부 , default: true
+auto.commit.interval.ms : 자동 오프셋 커밋일 때 interval 시간, default 5초
+
+configs.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
+configs.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 60000);
+```  
+
+* 일정 간격, poll() 메서드 호출 시 자동 commit. commit 관련 코드를 작성할 필요 없어 편리하다.  
+* 속도가 가장 빠름
+* 중복 또는 유실이 발생 할 수 있음
+	* server 장애로 인해 중단시, offset commit이 되지 않아, 데이터가 중복 또는 유실 될 수 있음.
+	* 일부 데이터가 중복/유실되도 상관 없는 곳(GPS 등)에서 사용
+	
+![image](https://user-images.githubusercontent.com/67637716/201509603-1a324483-15eb-4ef4-82af-6f60c022af4c.png)  
+
+EX : 결제를 했는데 2번 결재됨 등  
+
+#### 오토 커밋을 사용하지 않는다
+enable.auto.commit=false  
+
+밑의 두가지 방법을 사용하여 commit을 제어해야한다.  
+1) commitSync() : 동기 커밋  
+2) commitAsync() : 비동기 커밋  
+
+#### commitSync()
+* ConsumerRecord 처리 순서 보장
+* 가장 느림(커밋이 완료될 때까지 block)
+* poll() 메서드로 반환된 ConsumerRecord의 마지막 offset을 커밋
+* Map<TopicPartition, OffsetAndMetadata>을 통해 오프셋 지정 커밋 가능
+	* 1개가 처리될때마다 1번씩 offset commit가능  
+![image](https://user-images.githubusercontent.com/67637716/201509903-6b6e3796-b25e-4582-ab93-f2c9264a613f.png)  
 
 
 
+
+
+#### commitAsync()
+* 동기 커밋보다 빠름
+	* 커밋을 요청하는 시간동안 polling을 기다리지 않음
+* 중복이 발생할 수 있음
+	* 일시적인 통신 문제로 이전 offset보다 이후 offset이 먼저 커밋 될때
+* consumerRecord 처리 순서 보장 x
+	* 처리 순서가 중요한 서비스(주문, 재고관리 등)에서는 사용 제한
+
+
+``` java
+while (true) {
+	ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+	records.forEach(record -> {
+		System.out.println(record.value());
+	});
+
+	try {
+		consumer.commitSync();
+	}catch(CommitFailedException e) {
+		System.err.println("commit failed");
+	}
+}
+
+//// offset 지정 커밋
+
+while (true) {
+	ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+	Map<TopicPartition, OffsetAndMetadata> currentOffset = new HashMap<>();
+	records.forEach(record -> {
+		currentOffset.put(new TopicPartition(record.topic(), record.partition()),
+				new OffsetAndMetadata(record.offset() + 1, null));
+		consumer.commitSync();
+		System.out.println(record.value());
+	});
+
+	try {
+		consumer.commitSync();
+	}catch(CommitFailedException e) {
+		System.err.println("commit failed");
+	}
+}
+
+```  
+
+
+
+
+
+
+ 
 
 
 
