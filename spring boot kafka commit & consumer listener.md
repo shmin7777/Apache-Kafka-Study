@@ -25,6 +25,8 @@ Consumer가 해당 topic을 subscribe하여 topic을 받아올 수 있다.
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, deserializer);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+	// 제일 처음의 offset 부터 가져옴
+	props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest "); //defualt latest (가장 최신의 데이터부터 가져옴)
         return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), deserializer);
     }
 
